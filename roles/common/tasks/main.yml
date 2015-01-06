@@ -1,0 +1,110 @@
+---
+- command: uname -a
+
+- name: Disable selinux
+  template: src=selinux.config.j2 dest=/etc/selinux/
+  tags: selinux
+
+- name: Yum clean all
+  command: /usr/bin/yum clean all
+  tags: yum
+
+- name: Update yum packages
+  yum: name=* state=latest
+  tags: yum
+
+- name: Restart machine
+  command: shutdown -r now "Ansible updates triggered"
+  async: 0
+  poll: 0
+  ignore_errors: true
+
+- name: Waiting for server to come back
+  local_action: wait_for host={{ inventory_hostname }}
+                state=started
+  sudo: false
+
+- name: Install the 'Development tools' package group
+  yum: name="@Development tools" state=present
+
+- name: Install basic packages
+  yum: pkg={{ item }} state=latest
+  with_items:
+    - zlib-devel
+    - bzip2-devel
+    - openssl-devel
+    - ncurses-devel
+    - sqlite-devel
+    - readline-devel
+    - tk-devel
+    - gdbm-devel
+    - db4-devel
+    - libpcap-devel
+    - xz-devel
+    - freetype-devel
+    - vim
+    - wget
+    - git-core
+
+- name: Install python
+  copy: src=Python-2.7.5.tar.bz2 dest=/root/install/
+  tags: python
+
+- command: tar xvf Python-2.7.5.tar.bz2
+  args:
+    chdir: "{{ install_root }}"
+
+- command: ./configure --prefix=/usr/local --enable-shared
+  args:
+    chdir: "{{ install_root }}/Python-2.7.5"
+
+- replace:
+    dest="{{ install_root }}/Python-2.7.5/Modules/Setup"
+    regexp='^#zlib'
+    replace='zlib'
+    backup=yes
+
+- command: make
+  args:
+    chdir: "{{ install_root }}/Python-2.7.5"
+
+- command: make altinstall
+  args:
+    chdir: "{{ install_root }}/Python-2.7.5"
+
+- shell: echo /usr/local/lib >> /etc/ld.so.conf
+- command: ldconfig
+
+- command: python2.7 -V
+
+- user: name=deploy password="@ZoomDeploy"
+
+lineinfile: "dest=/etc/sudoers line='deploy    ALL=(ALL)    NOPASSWD: ALL'"
+
+- name: Config env vars1
+  copy: src=.private dest=/home/deploy/
+  tags: env
+
+- name: Config env vars2
+  copy: src=.private dest=/root/
+  tags: env
+
+
+#- name: configure sudoers
+#  lineinfile: dest=/etc/sudoers backup=yes state=present regexp='^%UBUNTU' insertafter="^# %wheel" line='%UBUNTU ALL=(ALL) ALL'
+#  tags: config-sudoers
+
+
+#- name: Configure ntp file
+#  template: src=ntp.conf.j2 dest=/etc/ntp.conf
+#  tags: ntp
+#  notify: restart ntp
+#
+#- name: Start the ntp service
+#  service: name=ntpd state=started enabled=true
+#  tags: ntp
+#
+#- name: test to see if selinux is running
+#  command: getenforce
+#  register: sestatus
+#  changed_when: false
