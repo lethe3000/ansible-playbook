@@ -1,31 +1,44 @@
 ---
-- command: uname -a
-
 - name: Disable selinux
-  template: src=selinux.config.j2 dest=/etc/selinux/
-  tags: selinux
+  selinux: state=disabled
+  tags:
+    - selinux
+    - common
 
 - name: Yum clean all
   command: /usr/bin/yum clean all
-  tags: yum
+  tags:
+    - yum
+    - common
 
 - name: Update yum packages
   yum: name=* state=latest
-  tags: yum
+  tags:
+    - yum
+    - common
 
 - name: Restart machine
   command: shutdown -r now "Ansible updates triggered"
   async: 0
   poll: 0
   ignore_errors: true
+  tags:
+    - reboot
+    - common
 
 - name: Waiting for server to come back
   local_action: wait_for host={{ inventory_hostname }}
                 state=started
   sudo: false
+  tags:
+    - reboot
+    - common
 
 - name: Install the 'Development tools' package group
   yum: name="@Development tools" state=present
+  tags:
+    - devtool
+    - common
 
 - name: Install basic packages
   yum: pkg={{ item }} state=latest
@@ -45,66 +58,84 @@
     - vim
     - wget
     - git-core
+  tags:
+    - devtool
+    - common
 
 - name: Install python
   copy: src=Python-2.7.5.tar.bz2 dest=/root/install/
-  tags: python
+  tags:
+    - python
+    - common
 
-- command: tar xvf Python-2.7.5.tar.bz2
+- name: Extract python
+  command: tar xvf Python-2.7.5.tar.bz2
   args:
     chdir: "{{ install_root }}"
+  tags:
+    - python
+    - common
 
-- command: ./configure --prefix=/usr/local --enable-shared
+- name: Configure python
+  command: ./configure --prefix=/usr/local --enable-shared
   args:
     chdir: "{{ install_root }}/Python-2.7.5"
+  tags:
+    - python
+    - common
 
-- replace:
+- name: Set zlib for python
+  replace:
     dest="{{ install_root }}/Python-2.7.5/Modules/Setup"
     regexp='^#zlib'
     replace='zlib'
     backup=yes
+  tags:
+    - python
+    - common
 
-- command: make
+- name: Make python
+  command: make && make altinstall
   args:
     chdir: "{{ install_root }}/Python-2.7.5"
+  tags:
+    - python
+    - common
 
-- command: make altinstall
-  args:
-    chdir: "{{ install_root }}/Python-2.7.5"
+#- shell: echo /usr/local/lib >> /etc/ld.so.conf
+#- command: ldconfig
 
-- shell: echo /usr/local/lib >> /etc/ld.so.conf
-- command: ldconfig
+#- command: python2.7 -V
 
-- command: python2.7 -V
+#- user: name=deploy password="@ZoomDeploy"
 
-- user: name=deploy password="@ZoomDeploy"
+#lineinfile: "dest=/etc/sudoers line='deploy    ALL=(ALL)    NOPASSWD: ALL'"
 
-lineinfile: "dest=/etc/sudoers line='deploy    ALL=(ALL)    NOPASSWD: ALL'"
+#- name: Config env vars1
+#  copy: src=.private dest=/home/deploy/
+#  tags: env
 
-- name: Config env vars1
-  copy: src=.private dest=/home/deploy/
-  tags: env
-
-- name: Config env vars2
-  copy: src=.private dest=/root/
-  tags: env
+#- name: Config env vars2
+#  copy: src=.private dest=/root/
+#  tags: env
 
 
 #- name: configure sudoers
-#  lineinfile: dest=/etc/sudoers backup=yes state=present regexp='^%UBUNTU' insertafter="^# %wheel" line='%UBUNTU ALL=(ALL) ALL'
-#  tags: config-sudoers
-
-
-#- name: Configure ntp file
-#  template: src=ntp.conf.j2 dest=/etc/ntp.conf
-#  tags: ntp
-#  notify: restart ntp
+##  lineinfile: dest=/etc/sudoers backup=yes state=present regexp='^%UBUNTU' insertafter="^# %wheel" line='%UBUNTU ALL=(ALL) ALL'
+##  tags: config-sudoers
 #
-#- name: Start the ntp service
-#  service: name=ntpd state=started enabled=true
-#  tags: ntp
 #
-#- name: test to see if selinux is running
-#  command: getenforce
-#  register: sestatus
-#  changed_when: false
+##- name: Configure ntp file
+##  template: src=ntp.conf.j2 dest=/etc/ntp.conf
+##  tags: ntp
+##  notify: restart ntp
+##
+##- name: Start the ntp service
+##  service: name=ntpd state=started enabled=true
+##  tags: ntp
+##
+##- name: test to see if selinux is running
+##  command: getenforce
+##  register: sestatus
+##  changed_when: false
+#
