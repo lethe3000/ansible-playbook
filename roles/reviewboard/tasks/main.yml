@@ -15,7 +15,6 @@
 - name: Install Reviewboard
   easy_install: name={{item}}
   with_items:
-    - ReviewBoard
     - pip
 
 - name: install various libraries with pip
@@ -24,6 +23,14 @@
     - python-memcached
     - virtualenv
     - supervisor
+    - ReviewBoard
+
+- name: Create reviewboard database
+  # Create a new database with name 'bobdata'
+  mysql_db: login_user=root login_password="mysql!#%@$^@181" name=reviewboard state=present
+
+- name: Create reviewboard mysql account
+  mysql_user: name=reviewboard password=reviewboard priv=reviewboard.*:ALL state=present
 
 - name: run reviewboard installer
   sudo: yes
